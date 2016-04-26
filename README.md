@@ -1,5 +1,7 @@
 # esxtop-collect
 Daemon has to be deployed on every vSphere server. It collects esxtop's statistics to influxdb for further use, for example, in grafana
+![](https://raw.githubusercontent.com/shep89/esxtop-collect/master/screenshots/grafana-cpu.png)
+![](https://raw.githubusercontent.com/shep89/esxtop-collect/master/screenshots/grafana-net-disks.png)
 
 # Preparing for first use
 1. Enable remote SSH console on vSphere hosts
