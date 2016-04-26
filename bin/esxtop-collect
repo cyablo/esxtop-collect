@@ -8,6 +8,8 @@ import signal
 import re
 import os
 p = 0
+influxdb_server = 'changeme.localnetwork.address'
+influxdb_dbname = 'db_name_to_collect_to'
 data = ''
 def sigterm_handler(_signo, _stack_frame):
 	print "Received signal", _signo
@@ -97,7 +99,7 @@ def writedata():
 	try:
 		#print data
 		#print "wrining " + str(len(data))
-		r = urllib2.Request('http://138.21.72.55/write?db=rci_esxtop', data)#, {'Content-Type': 'application/octet-stream'})
+		r = urllib2.Request('http://%s/write?db=%s' % (influxdb_server, influxdb_dbname), data)#, {'Content-Type': 'application/octet-stream'})
 		r.add_header('Content-Length', '%d' % len(data))
 		r.add_header('Content-Type', 'application/octet-stream')
 		urllib2.urlopen(r)
