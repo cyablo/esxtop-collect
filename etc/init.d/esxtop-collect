@@ -1,0 +1,84 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:         esxtop-collect
+# Required-Start:   $remote_fs $syslog
+# Required-Stop:    $remote_fs $syslog
+# Default-Start:    2 3 4 5
+# Default-Stop:     0 1 6
+# Short-Description: Collect disk statitics to InfluxDB
+# Description:      Start and stop esxtop-collect
+### END INIT INFO
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DESC="Collect esxtop statitics to InfluxDB"
+NAME=esxtop-collect
+DAEMON=/bin/$NAME
+DAEMON_ARGS=""
+PIDFILE=/var/run/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+LOGFILE=/var/log/$NAME
+
+start() {
+    echo -n "starting up $DAEMON"
+        trap  "{ rm -f ${PID_FILE}; exit 255; }" TERM INT EXIT
+    #RUN=`
+        $DAEMON $DAEMON_ARGS < /dev/null > $LOGFILE 2>&1 &
+#`
+    echo $! > ${PIDFILE}
+    if [ "$?" -eq 0 ]; then
+        echo " Done."
+    else
+        echo " FAILED."
+    fi
+}
+
+stop() {
+	# Если существует pid файл, то убиваем процесс с номером из pid файла
+	#killall $NAME
+	ps -c | grep "$DAEMON" | grep -v "grep" | while read _pid _d1 _d2 _d3 line
+	do
+		#echo "-$_pid--$line"
+		kill $_pid
+		rt=$?
+		if [ "$rt" == "0" ]
+		then
+			echo "$_pid, $line stoped"
+		else
+			echo "Error stopping $_pid, $line"
+		fi
+	done
+
+}
+
+status() {
+    ps -c | grep "$DAEMON" | grep -v "grep" | while read _pid _d1 _d2 _d3 line
+	do
+		echo "$_pid, $line is runing"
+	done
+}
+
+case "$1" in
+    start)
+    start
+    ;;
+
+    restart)
+    stop
+    sleep 2
+    start
+    ;;
+
+    stop)
+    stop
+    ;;
+
+    status)
+    status
+    ;;
+
+    *)
+    echo "usage : $0 start|restart|stop|status"
+    ;;
+esac
+
+exit 0
