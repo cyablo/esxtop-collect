@@ -10,11 +10,16 @@ Daemon has to be deployed on every vSphere server. It collects esxtop's statisti
 6. /etc/init.d/esxtop-collect start
 
 # Making installation easier on other hosts in a cluster
+
 Prepare
+
 1. Login to remote SSH console on vSphere host
 2. cd / ; rm /esxtop-collect.tgz ; tar -cz -f /esxtop-collect.tgz /bin/esxtop-collect /etc/init.d/esxtop-collect
 3. Place esxtop-collect.tgz on a web server
+
 Install
-1. wget -O - http://138.21.72.140/distrib/VMWare/grafana/esxtop-collect.tgz | tar - xz -C /
+
+1. wget -O - http://.../esxtop-collect.tgz | tar - xz -C /
 2. chkconfig esxtop-collect on
 3. /etc/init.d/esxtop-collect start
+
