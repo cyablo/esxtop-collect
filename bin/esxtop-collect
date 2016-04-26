@@ -1,0 +1,118 @@
+#!/bin/python
+from subprocess import Popen, PIPE
+from datetime import datetime, timedelta
+from time import mktime
+import urllib
+import urllib2
+import signal
+import re
+import os
+p = 0
+data = ''
+def sigterm_handler(_signo, _stack_frame):
+	print "Received signal", _signo
+	if len(data) > 0:
+		print "Writing data"
+		writedata()
+	os.kill( p.pid, signal.SIGTERM)
+	exit(0)
+signal.signal(signal.SIGTERM, sigterm_handler)
+timezone = timedelta(hours=3)
+
+
+def main ():
+	global p, data
+	#print "start 5 minute cycle"
+	p = Popen(['/bin/esxtop', '-b', '-l'
+	, '-n', '61' # 5 mins + 1 dummy iteration
+	], bufsize=1, stdout=PIPE)#, stdout=PIPE)
+	start = False
+	first_line_dropped = False
+	head = []
+	indexes = []
+	vcpuindexes = {}
+	data = ''
+	for line in iter(p.stdout.readline, ''):
+		line = line.split(',')
+		if start:
+			if first_line_dropped:
+				date = datetime.strptime(line[0], '"%m/%d/%Y %H:%M:%S"') #+ timezone
+				date = int(mktime(date.timetuple())) * 1000000000
+				for i in indexes: 
+					data += "%s,%s value=%s %s\n" % (head[i]['metric'], head[i]['tags'], line[i].replace('"', ''), date)
+				for i_vm in vcpuindexes: 
+					for i_vcpu in vcpuindexes[i_vm]: 
+						values = ''
+						delim = ''
+						for i_vstat in vcpuindexes[i_vm][i_vcpu]: 
+							values += '%s%s=%s' % (delim, i_vstat, line[vcpuindexes[i_vm][i_vcpu][i_vstat]].replace('"', ''))
+							delim = ','
+						data += "vcpu,host=%s,vm=%s,vcpu=%s %s %s\n" % (head[vcpuindexes[i_vm][i_vcpu][i_vstat]]['host'],i_vm, i_vcpu, values, date)
+				writedata()
+			else:
+				first_line_dropped = True
+			#print data
+			#print "Sending data", line[0]
+			
+		else:
+			line_len = len(line)
+			head = line
+			for i in range(line_len):
+				m = re.match( r'"\\\\(.+?)\\(.+?)(?:\((.+?)\)|(?:))\\(.+)"', head[i])
+				# 1 - hostname ; 2 - stat type ; 3- object ; 4 - metric name
+				if m:
+					if m.group(2) == "Virtual Disk" and m.group(3).find(':') > 0:
+						start = True
+						indexes.append(i)
+						# 3 - servername:device name
+						s = m.group(3).replace(' ', '\\ ').split(':', 1)
+						head[i] = {'metric' : m.group(4).replace(' ', '\\ '),
+									'tags' : "stat_type=%s,host=%s,vm=%s,device=%s" % (m.group(2).replace(' ', '\\ '), m.group(1).replace(' ', '\\ '), s[0], s[1])}
+					elif m.group(2) == "Network Port":
+						start = True
+						indexes.append(i)
+						# 3 - vswitch:...:...:device name
+						s = m.group(3).replace(' ', '\\ ').split(':')
+						head[i] = {'metric' : m.group(4).replace(' ', '\\ '),
+									'tags' : "stat_type=%s,host=%s,switch=%s,device=%s" % (m.group(2).replace(' ', '\\ '), m.group(1).replace(' ', '\\ '), s[0], s[-1])}
+					elif m.group(2) == "Vcpu" and m.group(3).find('vmx-vcpu') > 0:
+							start = True
+					#		indexes.append(i)
+					#		# ...:vmname:...:cpu num:vmname
+							s = m.group(3).replace(':vmx-', ':').replace(' ', '\\ ').split(':')
+							if not vcpuindexes.has_key(s[-1]):
+								vcpuindexes[s[-1]] = {}
+							if not vcpuindexes[s[-1]].has_key(s[-2]):
+								vcpuindexes[s[-1]][s[-2]] = {}
+							vcpuindexes[s[-1]][s[-2]][m.group(4).replace('% ', '').replace(' ', '')] = i
+							head[i] = {'host' : m.group(1).replace(' ', '\\ ')}
+							
+	#print data
+	#print "end 5 minute cycle"
+	#writedata()
+			
+
+def writedata():
+	global data
+	try:
+		#print data
+		#print "wrining " + str(len(data))
+		r = urllib2.Request('http://138.21.72.55/write?db=rci_esxtop', data)#, {'Content-Type': 'application/octet-stream'})
+		r.add_header('Content-Length', '%d' % len(data))
+		r.add_header('Content-Type', 'application/octet-stream')
+		urllib2.urlopen(r)
+		data = ''
+	except Exception, e:
+		print e
+		print "Data buffer len:" + str(len(data))
+	if len(data) > 104857600: # 100MB
+		data = ''
+
+
+
+if __name__ == "__main__":
+	try:
+		while True:
+			main()
+	except KeyboardInterrupt:
+		sigterm_handler("Ctrl+C", 0)
