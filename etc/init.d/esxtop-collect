@@ -22,7 +22,7 @@ start() {
     echo -n "starting up $DAEMON"
         trap  "{ rm -f ${PID_FILE}; exit 255; }" TERM INT EXIT
     #RUN=`
-        $DAEMON $DAEMON_ARGS < /dev/null > $LOGFILE 2>&1 &
+        python $DAEMON $DAEMON_ARGS < /dev/null > $LOGFILE 2>&1 &
 #`
     echo $! > ${PIDFILE}
     if [ "$?" -eq 0 ]; then
